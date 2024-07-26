@@ -14,38 +14,62 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
- import Api from '../tools/api';
 
- const api = new Api();
+import { allPass, compose, gt, __, tap, test, length } from 'ramda';
+import Api from '../tools/api';
 
- /**
-  * Я – пример, удали меня
-  */
- const wait = time => new Promise(resolve => {
-     setTimeout(resolve, time);
- })
+const api = new Api();
 
- const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
-     /**
-      * Я – пример, удали меня
-      */
-     writeLog(value);
+const isLengthLessThan10 = compose(gt(10), length);
+const isLengthGreaterThan2 = compose(gt(__, 2), length);
+const isPositive = compose(gt(__, 0), Number);
+const isValidChars = test(/^[0-9.]+$/);
 
-     api.get('https://api.tech/numbers/base', {from: 2, to: 10, number: '01011010101'}).then(({result}) => {
-         writeLog(result);
-     });
+const validateString = allPass([
+    isLengthLessThan10,
+    isLengthGreaterThan2,
+    isPositive,
+    isValidChars
+]);
 
-     wait(2500).then(() => {
-         writeLog('SecondLog')
+const toNumber = compose(Math.round, parseFloat);
 
-         return wait(1500);
-     }).then(() => {
-         writeLog('ThirdLog');
+const square = x => x * x;
+const remainderBy3 = x => x % 3;
 
-         return wait(400);
-     }).then(() => {
-         handleSuccess('Done');
-     });
- }
+const getBinary = (number) =>
+    api.get('https://api.tech/numbers/base', { from: 10, to: 2, number })
+        .then(({ result }) => result);
+
+const getRandomAnimal = (id) =>
+    api.get(`https://animals.tech/${id}`, {})
+        .then(({ result }) => result);
+
+const processSequence = ({ value, writeLog, handleSuccess, handleError }) => {
+    writeLog(value);
+
+    if (!validateString(value)) {
+        handleError('ValidationError');
+        return;
+    }
+
+    const number = toNumber(value);
+
+    getBinary(number)
+        .then(compose(
+            getRandomAnimal,
+            tap(writeLog),
+            remainderBy3,
+            tap(writeLog),
+            square,
+            tap(writeLog),
+            length,
+            tap(writeLog),
+        ))
+        .then(animal => {
+            handleSuccess(animal);
+        })
+        .catch(error => handleError(`API Error: ${error}`));
+};
 
 export default processSequence;
